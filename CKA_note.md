@@ -21,17 +21,17 @@
 
 ### Kubenetes config file
 - For root user, it needs to specify /etc/kubernetes/admin.conf
-'''
+```
 kubectl --kubeconfig /etc/kubernetes/admin.conf get all --all-namespaces
-'''
+```
 - Or set environment variable KUBECONFIG beforehand
-'''
+```
 export KUBECONFIG=/etc/kubernetes/admin.conf
-'''
+```
 - This has been taken into account in script k8s_master_init.sh
 
 ### What happens right after executing "kubeadm init"?
-'''
+```
 root@ip-172-31-42-202:~# kubectl get all --all-namespaces
 NAMESPACE     NAME                                           READY   STATUS    RESTARTS   AGE
 kube-system   pod/coredns-5644d7b6d9-w8scq                   0/1     Pending   0          53m
@@ -54,4 +54,4 @@ kube-system   deployment.apps/coredns   0/2     2            0           53m
 
 NAMESPACE     NAME                                 DESIRED   CURRENT   READY   AGE
 kube-system   replicaset.apps/coredns-5644d7b6d9   2         2         0       53m
-'''
+```
