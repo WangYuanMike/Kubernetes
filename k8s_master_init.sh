@@ -10,6 +10,11 @@
 #     and configuration will take effect directly in current bash shell
 #   - Only tested with AWS EC2 node (2 vCPU, 8GB memory)
 #############################################################################
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root" 
+   exit 1
+fi
+
 # Update OS
 apt-get update && apt-get upgrade -y
 
