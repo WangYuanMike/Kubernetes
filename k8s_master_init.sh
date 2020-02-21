@@ -12,7 +12,7 @@
 #############################################################################
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" 
-   exit 1
+   return
 fi
 
 # Update OS
@@ -22,7 +22,7 @@ apt-get update && apt-get upgrade -y
 apt-get install -y docker.io
 
 # Setup docker daemon (change its cgroupdriver to systemd)
-cat > /etc/docker/daemon.json <<EOF
+cat >> /etc/docker/daemon.json <<EOF
 {
   "exec-opts": ["native.cgroupdriver=systemd"],
   "log-driver": "json-file",
@@ -54,21 +54,33 @@ wget https://docs.projectcalico.org/manifests/calico.yaml
 
 # Maintain the ip address of server's primary interface in /etc/hosts
 cp /etc/hosts /etc/hosts.bak  # backup
-echo "$(hostname -i) k8smaster" >> /etc/hosts
+cat >> /etc/hosts <<EOF
+
+# Hostname for configure k8s Container Network Interface
+$(hostname -i) k8smaster
+EOF
 
 # Intialize k8s
 kubeadm init --config=kubeadm-config.yaml --upload-certs | tee kubeadm-init.out
 
 # Maintain KUBECONFIG env for root user
-cp /etc/bash.bashrc /etc/bash.bashrc.bak  # backup
-echo "export KUBECONFIG=/etc/kubernetes/admin.conf" >> ~/.bashrc
+cp ~/.bashrc ~/.bashrc.bak  # backup
+cat >> ~/.bashrc <<EOF
+
+# k8s admin config file, pre-requisite for using kubectl
+export KUBECONFIG=/etc/kubernetes/admin.conf
+EOF
 
 # Configure k8s auto completion
 # Check more details by running "kubectl completion -h"
 # https://kubernetes.io/docs/tasks/tools/install-kubectl/#enabling-shell-autocompletion
 apt-get install bash-completion -y
-echo "source /usr/share/bash-completion/bash_completion" >> ~/.bashrc
-echo "source <(kubectl completion bash)" >> ~/.bashrc
+cat >> ~/.bashrc <<EOF
+
+# bash completion and kubectl completion
+source /usr/share/bash-completion/bash_completion
+source <(kubectl completion bash)
+EOF
 
 # Source the bash config file for k8s env and config to take effect in current shell
 source ~/.bashrc

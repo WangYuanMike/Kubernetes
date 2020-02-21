@@ -11,7 +11,7 @@
 - Change container's cgroup driver to systemd
 - Install kubectl, kubeadm, kubelet
 - Download pod network (Calico) to use for CNI (Container Network Interface)
-- Maintain an alias for the server's primary ip address
+- Maintain an alias(k8smaster) for the server's primary ip address
 - Initialize k8s
 - export KUBECONFIG=/etc/kubernetes/admin.conf
 - Add kubectl auto completion
@@ -31,3 +31,19 @@
   - [bash manual](https://www.gnu.org/software/bash/manual/html_node/index.html#SEC_Contents)
   - `ps -ef --forest` is useful for checking relationship between bash shell processes
 ### 3.2 Grow Cluster
+#### Run script k8s_worker_init.sh with root user
+- Install container runtime
+- Change container's cgroup driver to systemd
+- Install kubectl, kubeadm, kubelet
+- Initialize k8s
+#### Do these steps manually with root user on both nodes
+- **[Master]**Generate the worker node join command by running `kubeadm token create --print-join-command` which would create a new k8s token and corresponding hash
+- **[Worker]**Maintain an alias(k8smaster) of the master node's primary ip address in work node's /etc/hosts
+- **[Worker]**Join worker node by running the join command generated in the first step
+#### Check result
+- **[Master]**Run `kubectl get nodes` to check the newly joined node
+- **[Worker]**`.kube/config` does not exist yet  
+#### Remarks
+- **Troubleshooting**
+  - use `telnet k8smaster 6443` on worker node to test connection to the apiserver on k8s master node
+  - if connection is fine, then the problem is probably due to an invalid token. Just rerun the command `kubeadm token create --print-join-command` on master node, and try the newly generated join command on worker node

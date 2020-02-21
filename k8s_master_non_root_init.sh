@@ -18,8 +18,12 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 # Configure k8s auto completion
 # Check more details by running "kubectl completion -h"
 # https://kubernetes.io/docs/tasks/tools/install-kubectl/#enabling-shell-autocompletion
-echo "source /usr/share/bash-completion/bash_completion" >> ~/.bashrc
-echo "source <(kubectl completion bash)" >> ~/.bashrc
+cp ~/.bashrc ~/.bashrc.bak  # backup
+cat >> ~/.bashrc <<EOF
+# bash completion and kubectl completion
+source /usr/share/bash-completion/bash_completion
+source <(kubectl completion bash)
+EOF
 
 # Source the bash config file for k8s env and config to take effect in current shell
 source ~/.bashrc
