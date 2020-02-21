@@ -30,6 +30,8 @@
 - **Bash**
   - [bash manual](https://www.gnu.org/software/bash/manual/html_node/index.html#SEC_Contents)
   - `ps -ef --forest` is useful for checking relationship between bash shell processes
+- **Calico**
+  - [Kubernetes network with Calico](https://www.tigera.io/blog/kubernetes-networking-with-calico/)
 ### 3.2 Grow Cluster
 #### Run script k8s_worker_init.sh with root user
 - Install container runtime
@@ -42,8 +44,12 @@
 - **[Worker]**Join worker node by running the join command generated in the first step
 #### Check result
 - **[Master]**Run `kubectl get nodes` to check the newly joined node
-- **[Worker]**`.kube/config` does not exist yet  
+- **[Worker]**`.kube/config` does not exist yet, therefore `kubectl get nodes` does not work on worker node
 #### Remarks
 - **Troubleshooting**
-  - use `telnet k8smaster 6443` on worker node to test connection to the apiserver on k8s master node
-  - if connection is fine, then the problem is probably due to an invalid token. Just rerun the command `kubeadm token create --print-join-command` on master node, and try the newly generated join command on worker node
+  - Use `telnet k8smaster 6443` on worker node to test connection to the apiserver on k8s master node
+  - If connection is fine, then the problem is probably due to an invalid token. Just rerun the command `kubeadm token create --print-join-command` on master node, and try the newly generated join command on worker node
+### 3.3 Finish Cluster Setup
+- **[Master]**Run `kubectl taint nodes --all node.kubernetes.io/not-ready-` to delete this default taints. For training purpose, we deliberately delete this taints to allow non-infrastructure pods being deployed on the master node.
+- Check `coredns` pods are running
+- Check `tunl0` interface is created
