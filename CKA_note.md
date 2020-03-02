@@ -55,22 +55,26 @@
 - Check `tunl0` interface is created
 - On both nodes use `ip route` to check route table to get an overview about ip, interface, node, pod, subnet and so on
 ### 3.4 Deploy A Simple Application
-- **[Master]Create deployment nginx** 
-  - Two ways to create deployment: 
-    - use nginx image directly `kubectl create deployment nginx --image=nginx`
-    - use deployment yaml file `kubectl create -f first.yaml`
-  - Three ways to check deployment in yaml format:
-    - `kubectl get deployment nginx -o yaml`
-    - `kubectl create deployment two --image=nginx --dry-run -o yaml`
-    - `kubect get deployments nginx --export -o yaml` (no unique info, e.g. createTime, Status)
-  - Add container port info in deployment yaml file
-  - Patch deployment with container port `kubectl replace -f first.yaml`
-  - Create service of nginx deployment `kubectl expose deployment/nginx`  
-  - Scale deployment with more replicas `kubectl scale deployment nginx --replicas=3`
-  - Get end point of nginx service `kubectl get ep nginx`
-  - Start monitoring tcp traffic on tunl0 interface of both nodes `sudo tcp -i tunl0`
-  - Curl to the end point of nginx service and ip of nginx pods and watch tcpdump of tunl0
-  - Delete some nginx pod and watch tcp traffic in tun10 `kubectl delete pod nginx-.....`
+- Two ways to create deployment: 
+- use nginx image directly `kubectl create deployment nginx --image=nginx`
+- use deployment yaml file `kubectl create -f first.yaml`
+- Three ways to check deployment in yaml format:
+- `kubectl get deployment nginx -o yaml`
+- `kubectl create deployment two --image=nginx --dry-run -o yaml`
+- `kubect get deployments nginx --export -o yaml` (no unique info, e.g. createTime, Status)
+- Add container port info in deployment yaml file
+- Patch deployment with container port `kubectl replace -f first.yaml`
+- Create service of nginx deployment `kubectl expose deployment/nginx`  
+- Scale deployment with more replicas `kubectl scale deployment nginx --replicas=3`
+- Get end point (pod ip) of nginx `kubectl get ep nginx`
+- Start monitoring tcp traffic on tunl0 interface of both nodes `sudo tcp -i tunl0`
+- Curl to the nginx service cluster ip and corresponding pod ip and watch tcpdump of tunl0
+- Delete some nginx pod and watch tcp traffic in tun10 `kubectl delete pod nginx-.....`
 - **Remarks**
-  - I saw traffic through tunl0 when curl to nginx service endpoint or pod ip, but did not see any traffic through tunl0 when deleting nginx pod
+  - I saw traffic through tunl0 when curl to nginx service cluster ip or endpoint, but did not see any traffic through tunl0 when deleting nginx pod
+### 3.5 Access from Outside the Cluster
+- Delete existing nginx service `kubectl delete svc nginx`
+- Create a new nginx service with type LoadBalancer `kubectl expose deployment nginx --type=LoadBalancer`
+- Get the port of the LoadBalancer service `kubectl get svc nginx`
+- Use public IP of any node and serivce port to access nginx web server for verification
 
