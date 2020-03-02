@@ -50,6 +50,27 @@
   - Use `telnet k8smaster 6443` on worker node to test connection to the apiserver on k8s master node
   - If connection is fine, then the problem is probably due to an invalid token. Just rerun the command `kubeadm token create --print-join-command` on master node, and try the newly generated join command on worker node
 ### 3.3 Finish Cluster Setup
-- **[Master]**Run `kubectl taint nodes --all node.kubernetes.io/not-ready-` to delete this default taints. For training purpose, we deliberately delete this taints to allow non-infrastructure pods being deployed on the master node.
+- **[Master]**Run `kubectl taint nodes --all node-role.kubernetes.io/master-` to delete this default taints. For training purpose, we deliberately delete this taints to allow non-infrastructure pods being deployed on the master node. Also run `kubectl taint nodes --all node.kubernetes.io/not-ready-` if this taint is presented in the output of `kubectl describe node <node_name> | grep -i taint`.
 - Check `coredns` pods are running
 - Check `tunl0` interface is created
+- On both nodes use `ip route` to check route table to get an overview about ip, interface, node, pod, subnet and so on
+### 3.4 Deploy A Simple Application
+- **[Master]Create deployment nginx** 
+  - Two ways to create deployment: 
+    - use nginx image directly `kubectl create deployment nginx --image=nginx`
+    - use deployment yaml file `kubectl create -f first.yaml`
+  - Three ways to check deployment in yaml format:
+    - `kubectl get deployment nginx -o yaml`
+    - `kubectl create deployment two --image=nginx --dry-run -o yaml`
+    - `kubect get deployments nginx --export -o yaml` (no unique info, e.g. createTime, Status)
+  - Add container port info in deployment yaml file
+  - Patch deployment with container port `kubectl replace -f first.yaml`
+  - Create service of nginx deployment `kubectl expose deployment/nginx`  
+  - Scale deployment with more replicas `kubectl scale deployment nginx --replicas=3`
+  - Get end point of nginx service `kubectl get ep nginx`
+  - Start monitoring tcp traffic on tunl0 interface of both nodes `sudo tcp -i tunl0`
+  - Curl to the end point of nginx service and ip of nginx pods and watch tcpdump of tunl0
+  - Delete some nginx pod and watch tcp traffic in tun10 `kubectl delete pod nginx-.....`
+- **Remarks**
+  - I saw traffic through tunl0 when curl to nginx service endpoint or pod ip, but did not see any traffic through tunl0 when deleting nginx pod
+
