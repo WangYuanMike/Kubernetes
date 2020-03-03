@@ -80,6 +80,8 @@ cat >> ~/.bashrc <<EOF
 # bash completion and kubectl completion
 source /usr/share/bash-completion/bash_completion
 source <(kubectl completion bash)
+alias k=kubectl
+complete -F __start_kubectl k
 EOF
 
 # Source the bash config file for k8s env and config to take effect in current shell
