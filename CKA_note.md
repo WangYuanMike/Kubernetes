@@ -70,8 +70,7 @@
 - Start monitoring tcp traffic on tunl0 interface of both nodes `sudo tcp -i tunl0`
 - Curl to the nginx service cluster ip and corresponding pod ip and watch tcpdump of tunl0
 - Delete some nginx pod and watch tcp traffic in tun10 `kubectl delete pod nginx-.....`
-
-**Remarks**
+#### Remarks
 - I saw traffic through tunl0 when curl to nginx service cluster ip or endpoint, but did not see any traffic through tunl0 when deleting nginx pod
 ### 3.5 Access from Outside the Cluster
 - Delete existing nginx service `kubectl delete svc nginx`
@@ -117,16 +116,16 @@
   - Retrieve data from `~./kube/config`
   - Create pem file, e.g. `echo $client | base64 -d - > ./client.pem`
 - Execute curl command with these three pem files to access kube-apiserver
-  - `curl --cert ./client.pem --key ./client-key.pem --cacert /ca.pem https://k8smaster:6443/api/v1/pods`
+  - `curl --cert ./client.pem --key ./client-key.pem --cacert ./ca.pem https://k8smaster:6443/api/v1/pods`
 - Create pod through curl
   - create a json file `curlpod.json` for to-be-created pod first
-  - `curl --cert ./client.pem --key ./client-key.pem --cacert /ca.pem https://k8smaster:6443/api/v1/pods -XPOST -H'Content-Type: application/json' -d @curlpod.json`
-
-**Remarks**:
+  - `curl --cert ./client.pem --key ./client-key.pem --cacert ./ca.pem https://k8smaster:6443/api/v1/pods -XPOST -H'Content-Type: application/json' -d @curlpod.json`
+#### Remarks
 - TLS keys (i.e. cacert, client cert, and private key of client cert) are mandatory for accessing kube-apiserver. When using kubectl, it handles the TLS key stuff automatically for the user. When using curl or golang client, the TLS keys need to be taken care by the user through the ways mentioned above
 - kube-apiserver only accepts json format input, e.g. pod description. kubectl converts yaml file into json, while curl and golang does not do the convert. Therefore the input for them could only be json. So as the output
 - kube-apiserver requires a **Mutual TLS**, i.e. not only the server needs to prove its identity to the client, but the client needs to prove its identity to the server as well. That's why client cert and corresponding private key are needed in this case. Mutual TLS is normally used in the distributed system instead of the common browser/server scenario
 - [This Video](https://youtu.be/yzz3bcnWf7M?t=4726) explains the mechanism of the Mutual TLS. It also covers a lot of other aspects of TLS in the entire video
+- One can also use `curl -k` option to avoid using TLS keys, which would perform **insecure** SSL connections and transfer 
 ### 5.2 Explore API Calls
 - Use strace to dump the operations of a k8s api call to a file `strace -o kubectl get endpoints > strace.out`
 - Search for system call `openat` in the dump file
@@ -134,8 +133,43 @@
 - Pick any of the directorys under the one mentioned above and look at the json in it, .e.g.
   - `python3 -m json.tool <above_dir>/v1/serverresources.json | grep kind`
   - `python3 -m json.tool <above_dir>/apps/v1/serverresources.json | grep kind`
-
-**Remarks**:
+#### Remarks
 - `~/.kube/cache/discovery/k8smaster_6443` provide meta-data of the k8s API objects, e.g. kind, name, shortnames, verbs/actions. It is a good place to check the skeleton of kube-apiserver
-
-
+## 6 API Objects
+### 6.1 RESTful API Access
+- Get secret which contains token in default namespace `kubectl get secrets`
+- Get token out of the secret `export token=$(kubectl describe secret <default-token-name> | grep ^token | cut -d ' ' -f 7)`
+- Use token to access k8s api server `curl https://k8smaster:6443/apis -H "Authorization: Bearer $token" --cacert ./ca.pem`
+#### Remarks
+- Bearer token could be an option to replace the client certificate and client private key which are mentioned in last chapter
+- `systemserviceaccount` is used in accessing the api server. Therefore, objects like namespace are not allowed to access due to missing RBAC authorization of this user
+- Token and server certificate are automatically made available to a pod under `/var/run/secrets/kubernetes.io/serviceaccount/` so that pod could make use of the token and certificate to access api server
+### 6.2 Using the Proxy
+- Setup k8s proxy on master node `kubectl proxy --api-prefix=/ &` which listens on `http://127.0.0.1:8001` by default
+- Access api server through the proxy `curl http://127.0.0.1:8001/api/`
+#### Remarks
+- proxy handles authentication (cert, key, or token) for curl
+- namespace can also be accessed because proxy makes the request on your behalf
+- proxy can be setup in a pod as well
+- setup a proxy on localhost is troubleshooting method which could narrow the issue, e.g. if a user could not access namespace with the token way, while the proxy way works, then it means the issue is narrowed to the missing authentication or authorization of the user
+### 6.3 Working with Jobs
+#### Create a Job
+- Create `job.yaml`, using busybox image to sleep 3 seconds and never restart
+- Create a job with job.yaml `kubectl create -f job.yaml`
+- Check job information:
+  - `kubectl get job`
+  - `kubectl describe job sleepy`
+  - `kubectl get job sleepy -o yaml`
+- Edit `job.yaml` by adding `completions: 5`
+- Delete job `kubectl delete job sleepy` and recreate the job with `job.yaml`
+- Do the same thing for `parallelism: 2`
+- and `activeDeadlineSeconds: 15`
+- Check the behavior of all these configurations
+#### Create a CronJob
+- Create `cronjob.yaml` based on `job.yaml`, and change the sleep seconds from 3 to 5
+- Create the CronJob with cronjob.yaml `kubectl create -f cronjob.yaml`
+- Check cronjob and job information:
+  - `kubectl get cronjobs`
+  - `kubectl get job`
+- Add `activeDeadlineSeconds: 10` to `cronjob.yaml`
+- Delete the old cronjob, recreate it with new yaml file, and watch the behavior
