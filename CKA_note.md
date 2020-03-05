@@ -111,5 +111,31 @@
   - If it encounters errors from DaemoneSet, run `kubectl drain <worker node name> --ignore-damonsets --delete-local-data`
 - The above commands will add a taint on the worker node to prevent pods being scheduled onto it. Check it by `kubectl describe node | grep -i taint`
 - When the node can be used again after maintenance, then uncordon it `kubectl uncordon <worker node name>`
+## 5 APIs and Access
+### 5.1 Configuring TLS Access
+- Prepare ca certificate (server certificate), client certificate, and private key of client certificate:
+  - Retrieve data from `~./kube/config`
+  - Create pem file, e.g. `echo $client | base64 -d - > ./client.pem`
+- Execute curl command with these three pem files to access kube-apiserver
+  - `curl --cert ./client.pem --key ./client-key.pem --cacert /ca.pem https://k8smaster:6443/api/v1/pods`
+- Create pod through curl
+  - create a json file `curlpod.json` for to-be-created pod first
+  - `curl --cert ./client.pem --key ./client-key.pem --cacert /ca.pem https://k8smaster:6443/api/v1/pods -XPOST -H'Content-Type: application/json' -d @curlpod.json`
+
+**Remarks**:
+- TLS keys (i.e. cacert, client cert, and private key of client cert) are mandatory for accessing kube-apiserver. When using kubectl, it handles the TLS key stuff automatically for the user. When using curl or golang client, the TLS keys need to be taken care by the user through the ways mentioned above
+- kube-apiserver only accepts json format input, e.g. pod description. kubectl converts yaml file into json, while curl and golang does not do the convert. Therefore the input for them could only be json. So as the output
+- kube-apiserver requires a **Mutual TLS**, i.e. not only the server needs to prove its identity to the client, but the client needs to prove its identity to the server as well. That's why client cert and corresponding private key are needed in this case. Mutual TLS is normally used in the distributed system instead of the common browser/server scenario
+- [This Video](https://youtu.be/yzz3bcnWf7M?t=4726) explains the mechanism of the Mutual TLS. It also covers a lot of other aspects of TLS in the entire video
+### 5.2 Explore API Calls
+- Use strace to dump the operations of a k8s api call to a file `strace -o kubectl get endpoints > strace.out`
+- Search for system call `openat` in the dump file
+- One shoudl find many `openat` calls for directory `~/.kube/cache/discovery/k8smaster_6443`
+- Pick any of the directorys under the one mentioned above and look at the json in it, .e.g.
+  - `python3 -m json.tool <above_dir>/v1/serverresources.json | grep kind`
+  - `python3 -m json.tool <above_dir>/apps/v1/serverresources.json | grep kind`
+
+**Remarks**:
+- `~/.kube/cache/discovery/k8smaster_6443` provide meta-data of the k8s API objects, e.g. kind, name, shortnames, verbs/actions. It is a good place to check the skeleton of kube-apiserver
 
 
