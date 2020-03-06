@@ -112,7 +112,7 @@
 - When the node can be used again after maintenance, then uncordon it `kubectl uncordon <worker node name>`
 ## 5 APIs and Access
 ### 5.1 Configuring TLS Access
-- Prepare ca certificate (server certificate), client certificate, and private key of client certificate:
+- Prepare ca certificate (server certificate), client certificate, and client private key:
   - Retrieve data from `~./kube/config`
   - Create pem file, e.g. `echo $client | base64 -d - > ./client.pem`
 - Execute curl command with these three pem files to access kube-apiserver
@@ -121,11 +121,15 @@
   - create a json file `curlpod.json` for to-be-created pod first
   - `curl --cert ./client.pem --key ./client-key.pem --cacert ./ca.pem https://k8smaster:6443/api/v1/pods -XPOST -H'Content-Type: application/json' -d @curlpod.json`
 #### Remarks
-- TLS keys (i.e. cacert, client cert, and private key of client cert) are mandatory for accessing kube-apiserver. When using kubectl, it handles the TLS key stuff automatically for the user. When using curl or golang client, the TLS keys need to be taken care by the user through the ways mentioned above
+- TLS keys (i.e. cacert, client cert, and client private key) are mandatory for accessing kube-apiserver. When using kubectl, it handles the TLS key stuff automatically for the user. When using curl or golang client, the TLS keys need to be taken care by the user through the ways mentioned above
 - kube-apiserver only accepts json format input, e.g. pod description. kubectl converts yaml file into json, while curl and golang does not do the convert. Therefore the input for them could only be json. So as the output
 - kube-apiserver requires a **Mutual TLS**, i.e. not only the server needs to prove its identity to the client, but the client needs to prove its identity to the server as well. That's why client cert and corresponding private key are needed in this case. Mutual TLS is normally used in the distributed system instead of the common browser/server scenario
 - [This Video](https://youtu.be/yzz3bcnWf7M?t=4726) explains the mechanism of the Mutual TLS. It also covers a lot of other aspects of TLS in the entire video
 - One can also use `curl -k` option to avoid using TLS keys, which would perform **insecure** SSL connections and transfer 
+- There are three ways to access api server via curl as shown below. Check the other two ways in the chapter below.
+  - cacert + client cert + client private key
+  - cacert + token
+  - proxy
 ### 5.2 Explore API Calls
 - Use strace to dump the operations of a k8s api call to a file `strace -o kubectl get endpoints > strace.out`
 - Search for system call `openat` in the dump file
@@ -173,3 +177,74 @@
   - `kubectl get job`
 - Add `activeDeadlineSeconds: 10` to `cronjob.yaml`
 - Delete the old cronjob, recreate it with new yaml file, and watch the behavior
+## 7 Managing State with Deployments
+### 7.1 Working with ReplicaSets
+- Create a ReplicaSet yaml file `rs.yaml`
+  - name: rs-one
+  - replicas: 2
+  - label: ReplicaOne
+  - image: nginx:1.11.1
+- Create a ReplicaSet `rs-one` through yaml file `kubectl create -f rs.yaml`
+- View the newly created ReplicaSet `kubectl describe rs rs-one`
+- Delete the ReplicatSet without cascade (corresponding pods are not deleted) `kubectl delete rs rs-one --cascade=false`
+- Create the ReplicaSet with the same yaml file again, and it will take ownership of those two pods
+- Isolate one pod by editing its system label `kubectl edit pod <rs-pod-name>`
+- Check the system label of all pods `kubectl get pod -L system`
+- Delete the ReplicaSet and its pod `kubectl delete rs rs-one`
+- The rs-one pod is deleted, and the isolated one is still running `kubectl get pod`
+- Delete the isolated pod `kubectl delete pod -l system=IsolatedPod`
+#### Remarks
+- Here are the **watch loop** api objects which manage the state of containers in k8s:
+  - **Replication Controller**: only manages container state
+  - **ReplicaSet**: Replica Controller + selector
+  - **Deployment**: ReplicaSet + rolling upgrade feature
+  - **DaemonSet**: Similar with Deployment but DaemonSet ensures a pod will be created on each node of the cluster, including the newly added node
+- ReplicaSet is the core api object that manage the state of containers in major k8s releases
+### 7.2 Working with DaemonSets
+- Create a DaemonSet yaml file `ds.yaml`
+  - copy from rs.yaml
+  - remove replicas line
+  - change label from ReplicaOne to DaemonSetOne
+- Create a DaemonSet based on ds.yaml `kubectl create -f ds.yaml`
+- Watch the DaemonSet `kubectl get ds`
+- Watch corresponding pods `kubectl get pod -o wide`
+#### Remarks
+- In DaemonSet yaml file, replicas is not needed, because each node would get one pod deployed
+- Starting from k8s 1.12, user can configure certain nodes not to have a particular DaemonSet pods through scheduler
+### 7.3 Rolling Updates and Rollbacks
+#### DaemonSet UpdateStrategy: OnDelete (Delete pod, Create pod, Check change of new pod)
+  - Edit the update strategy of DaemonSet to **OnDelete** `kubectl edit ds ds-one`
+    - type: OnDelete
+  - Set image of DaemonSet to a newer version `kubectl set image ds ds-one nginx=nginx:1.12.1-alpine`
+  - Check the image version of corresponding pods `kubectl desrive pod <ds-one-pod-name> | grep Image:`
+  - Delete one of the two pods belong to the DaemonSet
+  - Check the image version of the old pod and the new pod to see the change
+#### DaemonSet UpdateStrategy: OnDelete (Change to a version, Delete pod, Check change of new pod)
+  - Check the change history for the DaemonSet `kubectl rollout history ds ds-one`
+  - View the versions of the DaemonSet `kubectl rollout history ds ds-one --revision=<revision No.>`
+  - Rollback to a version `kubectl rollout undo ds ds-one --to-revision=1`
+  - Check the image version of pods
+  - Delete one pod
+  - Check the image version of both pods
+#### DaemonSet UpdateStrategy: RollingUpdate
+  - Export DaemonSet ds-one to yaml file ds2.yaml `kubectl get ds ds-one -o yaml --export >> ds2.yaml`
+  - Change yaml file ds2.yaml
+    - name: ds-two
+    - type: RollingUpdate
+  - Create DaemonSet ds-two based on the yaml file
+  - Check all pods in default namespace `kubectl get pod`
+  - Check the image version of a ds-two pod `kubectl describe pod <ds-two-pod-name> | grep Image:`
+  - Edit ds-two and set a newer image version `kubectl edit ds ds-two`
+    - image: nginx: 1.12.1-alpine
+  - Check the age of DaemonSet ds-two `kubectl get ds ds-two`
+  - Check the age of all pods in default namespace
+  - Check the image version of one DaemonSet ds-two pod
+  - Check the rollout status of DaemonSet ds-two `kubectl rollout status ds ds-two`
+  - Check the rollout history of ds-two `kubectl rolloout history ds ds-two`
+  - View the second version in the rollout history `kubectl rollout history ds ds-two --revision=2`
+  - Clean up DaemonSets `kubectl delete ds ds-one ds-two`
+#### Remarks
+- Deployment has the same behavior in Rolling update and Rollback with DaemonSet
+- Rolling update is one of the key benefit of using Microservice architure
+
+  
