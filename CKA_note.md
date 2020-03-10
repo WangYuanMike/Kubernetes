@@ -246,5 +246,58 @@
 #### Remarks
 - Deployment has the same behavior in Rolling update and Rollback with DaemonSet
 - Rolling update is one of the key benefit of using Microservice architure
-
-  
+## 12 Logging and Troubleshooting
+### 12.1 Review Log File Locations
+#### If k8s is based on systemd,
+- check node level logs for kubelet `journalctl -u kubelet`
+- Locate kube-apiserver log file `sudo find / -name "*apiserver*log"`
+  - container log is identical to pod log, as it is a symbolic link to pod log
+  - use similar command to locate log file of `kube-dns, kube-flannel, kube-proxy`
+#### If k8s is not based on systemd,
+- [Master]
+  - `/var/log/kube-apiserver.log`
+  - `/var/log/kube-scheduler.log`
+  - `/var/log/kube-controller-manager.log`
+  - `/var/log/containers/`
+  - `/var/logpods/`
+- [Worker]
+  - `/var/log/kubelet.log`
+  - `/var/log/kube-proxy.log`
+#### More readings
+- [Debug service](https://kubernetes.io/docs/tasks/debug-application-cluster/debug-service/)
+- [Determine reason pod failure](https://kubernetes.io/docs/tasks/debug-application-cluster/determine-reason-pod-failure/)
+### 12.2 Viewing Logs Output
+- View pod logs `kubectl -n <namespace> logs <pod name>`
+- The infrastructure pods are under `kube-system` namespace
+### 12.3 Adding tools for monitoring and metrics
+#### Configure Metrics
+- Download **Metrics Server** `git clone https://github.com/kubernetes-incubator/metrics-server.git`
+- Create metrics server object `kubectl create -f metrics-server/deploy/kubernetes/`
+- Check metrics server pods `kubectl -n kube-system get pods`
+- Disable secure TLS for this lab environment
+  - `kubectl -n kube-system edit deployment metrics-server`
+  - Add this line to container's args `- --kubelet-insecure-tls`
+- Test the metrics working
+  - `kubectl top pod --all-namespaces`
+  - `kubectl top nodes`
+- Metrics server's http path in apiserver `https://k8smaster:6443/apis/metrics.k8s.io/v1beta1/nodes`
+- **Heapster** is deprecated, and **Metrics Server** has been further developed and deployed
+- Metrics server is written to interact with Docker, and it does not support crio
+#### Configure the Dashboard
+- Create dashboard object `kubectl create -f https://bit.ly/2OFQRMy`
+- Check dashboard service `kubectl get svc --all-namespaces`
+- Change the `'kubenetes-dashboard` service type to `NodePort`
+  - `kubectl -n kubernetes-dashboard edit svc kubernetes-dashboard`
+  - Edit type from `ClusterIP` to `NodePort`
+- Check the service again and write down the port number
+- Create clusterrolebinding to avoid RBAC and other permission error `kubectl create clusterrolebinding dashaccess --clusterrole=cluster-admin --serviceaccount=kubernetes-dashboard:kubernetes-dashboard`
+- Open browser and use `https://<public IP>:<dashboard service port>` to access dashboard
+- Since a self-signed certificate is not trusted by Chrome, you need to play some trick to let chrome trust it:
+  -[Windows] add exception, add trusted site
+  -[MacOS Catalina] type `thisisunsafe` in the Chrome window, or check [this link](https://vninja.net/2019/12/03/macos-catalina-chrome-cert-issues/) for other tricks
+- Get the token of dashboard `kubectl -n kubernetes-dashboard describe secrets kubernetes-dashboard-token-<press tab to auto complete the secret name>`
+- Paste token to the browser and you should be able to see the dashboard
+#### Remarks
+- Dashboard must be based on a "real" monitoring/metrics object, which is Metrics Server in this case
+- Dashboard is only updated with Metrics Server, as Heapster is deprecated
+- Dashboard does not provide full functionality of Metrics Server
