@@ -246,6 +246,32 @@
 #### Remarks
 - Deployment has the same behavior in Rolling update and Rollback with DaemonSet
 - Rolling update is one of the key benefit of using Microservice architure
+## 8 Services
+### Notes regarding Services Types
+- **Cluster IP** = simplest service type
+  - It provide a persistent access to pods which provide same function (pods can be up and down, therefore pod's IP address could be changed)
+  - It is only routable within cluster (from pod or service), routing rules defined by iptables or ipvs
+- **NodePort** = Cluster IP + Node Port
+  - Main function is same as Cluster IP, but the service is exposed through a port of the node, therefore it can be accessed externally
+- **LoadBalancer** = Cluster IP + Node Port + Load Balancer
+  - In cloud (e.g. AWS), a Load Balancer will be created in front of the Node Port Service
+  - Load Balancer charges customer additional cost, therefore NodePort should be used as much as possible if the access traffic is not high
+- **ExternalName**
+  - A special service type, map a service to a DNS CNAME record
+  - It does not use Label to map corresponding pods like other service types
+  - It just provide another DNS CNAME (e.g. my-service) to an existing service (e.g. my.database.example.com)
+### 8.1 Deploy A New Service
+- Create a deployment based on yaml file, which deploys two nginx server pods with spec.nodeSelector.system=secondOne
+- After label one node with this label, pods can be created by the deployment `kubectl label node <node-name> system=secondOne`
+- Then the pods can be accessed within cluster through <endpoint>:80
+- **Remarks**: Actually no service has been created in this section
+### 8.2 Configure a NodePort
+- Expose the deployment through a service with type NodePort `kubectl -n <namespace> expose deployment nginx-one --type=NodePort --name=service-lab`
+- **Remarks**: so far service has been created and can be accessed externally through the public IP address of any node
+### 8.3 Use Labels to Manage Resources
+- Delete the deployment using its labels `kubectl -n <namespace> delete deploy -l system=secondary`
+- Remove teh lable from the secondary node `kubectl label node <node-name> system-`
+
 ## 12 Logging and Troubleshooting
 ### 12.1 Review Log File Locations
 #### If k8s is based on systemd,
