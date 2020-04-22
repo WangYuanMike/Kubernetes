@@ -260,7 +260,7 @@
   - A special service type, map a service to a DNS CNAME record
   - It does not use Label to map corresponding pods like other service types
   - It just provide another DNS CNAME (e.g. my-service) to an existing service (e.g. my.database.example.com)
-### 8.1 Deploy A New Service
+### 8.1 Deploy a New Service
 - Create a deployment based on yaml file, which deploys two nginx server pods with spec.nodeSelector.system=secondOne
 - After label one node with this label, pods can be created by the deployment `kubectl label node <node-name> system=secondOne`
 - Then the pods can be accessed within cluster through <endpoint>:80
@@ -271,7 +271,20 @@
 ### 8.3 Use Labels to Manage Resources
 - Delete the deployment using its labels `kubectl -n <namespace> delete deploy -l system=secondary`
 - Remove teh lable from the secondary node `kubectl label node <node-name> system-`
-
+## 10 Ingress
+### 10.1 Advanced Service Exposure (Configure an Ingress Controller)
+- Deploy an NGINX deployment named `secondapp` and expose its service with type NodePort
+- Create `ClusterRole` and `ClusterRoleBinding` of ingress controller with file `ingress.rbac.yaml`
+- Create `serviceaccount, daemonset, and service` of ingress controller with file `traefik-ds.yaml`
+- Create `ingress` (ingress rule) with file `ingress.rule.yaml`
+- Test the ingress with command `curl -H "Host: www.example.com" http://k8smaster/`
+- Deploy another NGINX deployment named `thridpage` and also expose its service with type NodePort
+- Edit `ingress` to add the rule for `thirdpage`
+- Log into the pod and change the title of the thirdpage NGINX homepage to `Third Page` and the domain name to `thirdpage.org`
+- Test the ingress with command `curl -H "Host: thirdpage.org" http://k8smaster/`
+- `http://<public ip>:8080` can be used to check the traefik dashboard
+### Remarks:
+- Ingress does not have to be used together with a load balancer. Basically it is just a entrypoint which takes the request from client and route the request to the target service. 
 ## 12 Logging and Troubleshooting
 ### 12.1 Review Log File Locations
 #### If k8s is based on systemd,
