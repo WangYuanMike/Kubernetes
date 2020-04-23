@@ -273,7 +273,7 @@
 - Remove teh lable from the secondary node `kubectl label node <node-name> system-`
 ## 10 Ingress
 ### 10.1 Advanced Service Exposure (Configure an Ingress Controller)
-- Deploy an NGINX deployment named `secondapp` and expose its service with type NodePort
+- Deploy an NGINX deployment named `secondapp` and expose its service with type NodePort (`secondapp` is a backend service of the ingress)
 - Create `ClusterRole` and `ClusterRoleBinding` of ingress controller with file `ingress.rbac.yaml`
 - Create `serviceaccount, daemonset, and service` of ingress controller with file `traefik-ds.yaml`
 - Create `ingress` (ingress rule) with file `ingress.rule.yaml`
@@ -284,7 +284,15 @@
 - Test the ingress with command `curl -H "Host: thirdpage.org" http://k8smaster/`
 - `http://<public ip>:8080` can be used to check the traefik dashboard
 ### Remarks:
-- Ingress does not have to be used together with a load balancer. Basically it is just a entrypoint which takes the request from client and route the request to the target service. 
+- Ingress basically provides three functions: SSL termination, Layer 7 routing(e.g. path-based routing), and Load Balancing (done together with load balancer)
+- The core of an Ingress controller is Deployment(or Daemonset) and Service(usually with type Load Balancer)
+- Ingress resource defines the routing rules (normally is path-based), and it is implemented by the pods of ingress controller when the ingress resource yaml file is applied
+- Ingress does not have to be used together with a load balancer. The above case is an example. Basically ingress is just an entrypoint which takes the request from client and routes it to the target service based on the host name or path (i.e. L7 routing). However, Ingress is usually used together with a Load Balancer in front of it
+- Ingress controller can be used together with either L4 or L7 load balancer
+- In the case of L4 load balancer, path-based routing is done by ingress controller, as the L4 load balancer simply forwards the packet from client to the backend service. It may do NAT to replace the source and destination IP address of the packet, but it would not look into the content of the packet
+- It is better to use an ingress-native L7 load balancer (i.e. ingress controller is embedded as a component of the L7 load balancer, e.g. ALB in AWS). In this case, this load balancer can consider factors of both node workload and service target when making dispatch decision. As the L7 load balancer would terminate the http connection and look into the content, the dispatch cost is usually higher than L4 load balancer. Therefore, if an L7 load balancer (e.g. ELB in AWS) could not embed ingress L7 routing rules, it would then leave the path-based routing task to the ingress controller in the k8s cluster, which would cost additional resources in the cluster and may require one more hop to the node where the backend pod locates
+- client -> L4 Load Balancer or common L7 Load Balancer (workload-based dispatching) -> ingress controller (path-based dispatching) -> backend service
+- client -> ingress-native L7 Load Balancer (workload-based and path-based dispatching) -> backend service
 ## 12 Logging and Troubleshooting
 ### 12.1 Review Log File Locations
 #### If k8s is based on systemd,
