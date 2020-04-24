@@ -271,6 +271,48 @@
 ### 8.3 Use Labels to Manage Resources
 - Delete the deployment using its labels `kubectl -n <namespace> delete deploy -l system=secondary`
 - Remove teh lable from the secondary node `kubectl label node <node-name> system-`
+## 9 Volumes and Data
+### 9.1 Create a ConfigMap
+- ConfigMap is a set of key value pairs
+- ConfigMap can be created from a literal value or a file or a directory which contains files `kubectl create configmap colors --from-literal=text=black --from --file=./favorite --from-file=./primary/`
+- ConfigMap can be used to create env of a pod
+- ConfigMap can also be used to create a volume of a pod
+### 9.2 Creating a Persistent NFS Volume (PV)
+- Deploy an NFS server (package nfs-kernel-server) on k8s master node
+- Create file `/opt/sfw/hello.txt` and export them through NFS
+- Install package nfs-common on the worker node and mount the `/opt/sfw` dir to `/mnt` to test wheter NFS works
+- Create a PV with **1Gi** capacity and this NFS path `/opt/sfw` on k8s master node `kubectl create -f PVol.yaml`
+- Check the status of the PV `kubectl get pv`, which should be `Available`
+### 9.3 Creating a Persistent Volume Claim (PVC)
+- To use the newly created PV, a PVC (request **200Mi** storage) needs to be created `kubectl create -f pvc.yaml`
+- The status of the PV becomes `Bound`
+- Create a pod which uses the PVC by specifying it in `spec.template.spec.volumes`
+- Check the status of the PVC `kubectl get pvc`
+### 9.4 Using a ResourceQuota to Limit PVC Count and Usage
+- Create a namespace called `small` to test the ResourceQuota and ResourceLimit `kubectl create namespace small`
+- Create the PV and PVC in this namespace
+- Create a ResourceQuota object with a storage quota of **500Mi** `kubectl create -f storage-quota.yaml`
+- Check the resource quota of this namespace (Used 200Mi, Hard 500Mi) `kubectl describe ns small`
+- Create a pod under this namespace and check the status of the pod and the resrouce quota of the namespace (should have no change)
+- Create a 300M file in `/opt/sfw` and check the resource quota of the namespace (should have no change)
+- Delete the PVC and check the status of the PV (should become Released)
+- Delete the PV
+- Recreate the PV and patch the `persistentVolumeReclaimPolicy` to `Delete`
+- Check the status of the namespace (Used 0, Hard 500Mi)
+- Recreate the PVC (Used 200Mi, Hard 500Mi)
+- Delete the ResourceQuota from the namespace and change to a smaller quota (requests.storage: "100Mi")
+- Recreate the ResourceQuota to the namespace and check the status of the namespace (**Used 200Mi, Hard 100Mi**)
+- Check the status of the deployment and the pod (both works fine)
+- Remove the deployment and delete the PVC to test whether the reclaim of storage takes place
+- Check the status of the PV and it did not happen because it is lack of a **deleter volume plugin** for NFS
+- Delete the PV as well
+- Change the PV property `persistentVolumeReclaimPolicy` to `Recycle`
+- Add a LimitRange to the namespace `kubectl -n small create -f low-resource-range.yaml` and check the status of the namespace
+- Create the PV again and check its status (Reclaim Policy: Recycle, Status: Available)
+- Create the PVC and it would fail (**ResourceQuota only works together with Resource Limits**)
+- Edit the ResourceQuota and raise it to 500Mi
+- Create the PVC and Deployment, and now it works
+- Delete the PVC and PV
 ## 10 Ingress
 ### 10.1 Advanced Service Exposure (Configure an Ingress Controller)
 - Deploy an NGINX deployment named `secondapp` and expose its service with type NodePort (`secondapp` is a backend service of the ingress)
@@ -285,7 +327,7 @@
 - `http://<public ip>:8080` can be used to check the traefik dashboard
 ### Remarks:
 - Ingress basically provides three functions: SSL termination, Layer 7 routing(e.g. path-based routing), and Load Balancing (done together with load balancer)
-- The core of an Ingress controller is Deployment(or Daemonset) and Service(usually with type Load Balancer)
+- The core of an ingress controller is Deployment(or Daemonset) and Service(usually with type Load Balancer)
 - Ingress resource defines the routing rules (normally is path-based), and it is implemented by the pods of ingress controller when the ingress resource yaml file is applied
 - Ingress does not have to be used together with a load balancer. The above case is an example. Basically ingress is just an entrypoint which takes the request from client and routes it to the target service based on the host name or path (i.e. L7 routing). However, Ingress is usually used together with a Load Balancer in front of it
 - Ingress controller can be used together with either L4 or L7 load balancer
@@ -293,6 +335,7 @@
 - It is better to use an ingress-native L7 load balancer (i.e. ingress controller is embedded as a component of the L7 load balancer, e.g. ALB in AWS). In this case, this load balancer can consider factors of both node workload and service target when making dispatch decision. As the L7 load balancer would terminate the http connection and look into the content, the dispatch cost is usually higher than L4 load balancer. Therefore, if an L7 load balancer (e.g. ELB in AWS) could not embed ingress L7 routing rules, it would then leave the path-based routing task to the ingress controller in the k8s cluster, which would cost additional resources in the cluster and may require one more hop to the node where the backend pod locates
 - client -> L4 Load Balancer or common L7 Load Balancer (workload-based dispatching) -> ingress controller (path-based dispatching) -> backend service
 - client -> ingress-native L7 Load Balancer (workload-based and path-based dispatching) -> backend service
+- [A blog describrs NLB + NGINX ingress controller and compares this option with ALB](https://aws.amazon.com/blogs/opensource/network-load-balancer-nginx-ingress-controller-eks/)
 ## 12 Logging and Troubleshooting
 ### 12.1 Review Log File Locations
 #### If k8s is based on systemd,
