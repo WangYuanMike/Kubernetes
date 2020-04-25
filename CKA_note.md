@@ -336,6 +336,33 @@
 - client -> L4 Load Balancer or common L7 Load Balancer (workload-based dispatching) -> ingress controller (path-based dispatching) -> backend service
 - client -> ingress-native L7 Load Balancer (workload-based and path-based dispatching) -> backend service
 - [A blog describrs NLB + NGINX ingress controller and compares this option with ALB](https://aws.amazon.com/blogs/opensource/network-load-balancer-nginx-ingress-controller-eks/)
+## 11 Scheduling
+### 11.1 Assign Pods Using Labels
+- Check labels and taints of cluster nodes `kubectl describe nodes | grep -i label` `kubectl describe nodes | grep -i taint`
+- Check number of docker containers in both nodes `sudo docker ps | wc -l`
+- Add different labels to master node and worker node `kubectl label nodes <master> status=vip` `kubectl label nodes <worker> status=other`
+- Show labels of the two nodes `kubectl get nodes --show-labels`
+- Create `vip.yaml` which defines one pod that has 4 busybox containers with `nodeSelector.status=vip`
+- Apply `vip.yaml` and check the number of docker containers on both nodes (vip pod should be all deployed on master node)
+- Delete the vip pod and edit vip.yaml to comment out the nodeSelector.status part
+- Apply vip.yaml again and check the number of docker containers again (vip pod is deployed on worker node to make the cluster more balanced)
+### 11.2 Using Taints to Control Pod Deployment
+- Create a Deployment file named `taint.yaml` which deploys 8 pod, each has one nginx container
+- Apply taint.yaml and count containers (pods should be deployed more or less evenly on the 2 nodes)
+- Delete the deployment and taint the worker node with value `PreferNoSchedule` `kubectl taint nodes <worker> bubba=value:PreferNoSchedule` (The key, bubba, can be any word)
+- Apply taint.yaml and count containers (most of the pods should be on master, however a few are deployed on worker)
+- Delete the deployment and taint the worker with value `NoSchedule` `kubectl taint nodes <worker> bubba=value:NoSchedule` 
+- Apply taint.yaml and count containers (All of the pods are deployed on master)
+- Delete the deployment and untaint `kubectl taint nodes <worker> bubba-`
+- Apply taint.yaml and count containers (back to the first status, i.e. pods should be deployed more or less evenly on the 2 nodes)
+- Taint the worker node with `NoExecute` `kubectl taint nodes <worker> bubba=value:NoExecute`
+- Wait a minute and count containers (nearly all pods on worker move to the master node, including the ones which are not deployed by taint.yaml. Only a few in namespace kube-system are left on worker node, which are responsible for communication with the cluster)
+- Remove the taint, wait a minute, and count containers (most containers still reside in master node)
+- Drain the worker node `kubectl drain <worker>`
+- Check the status of nodes `kubectl get nodes` (Status of worker node becomes Ready.SchedulingDisabled)
+- Delete the deployment, apply taint.yaml, and count containers (nginx pods are all deployed to master node)
+- Uncordon the worker node `kubectl uncordon <worker>` and check status of nodes (work node back to Ready)
+- Delete the deployment, apply taint.yaml, and count contaienrs (container spread across the cluster, master has a few more due to its role)
 ## 12 Logging and Troubleshooting
 ### 12.1 Review Log File Locations
 #### If k8s is based on systemd,
