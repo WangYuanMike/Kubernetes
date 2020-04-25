@@ -428,4 +428,29 @@
 - Apply new-crontab.yaml (which is like to create a pod) `kubectl create -f new-crontab.yaml`
 - List CronTab objects `kubectl get CronTab` `kubectl get ct` (ct is short name for CronTab)
 - Command like `describe` `delete` can also be used on custom resource
-
+## 14 Helm
+### 14.1 Working with Helm and Charts
+- Download helm executable `wget https://get.helm.sh/helm-v3.0.0-linux-amd64.tar.gz`
+- Uncompress it and copy the files to /usr/local/bin `sudo cp linux-amd64/helm /usr/local/bin/helm3`
+- Add the most common helm repository and name it as stable `helm3 repo add stable https://kubernetes-charts.storage.googleapis.com`
+- Update the repo `helm3 repo update`
+- Install mariadb with name `firstdb` through corresponding helm chart in this repo `helm3 --debug install firstdb stable/mariadb --set master.persistence.enabled=false --set slave.persistence.enabled=false` (do not need persistence to avoid creating a PV)
+- Use the command in the output from the last command to get root password
+- Also use the output to run and logon a client pod of the mariadb
+- Use the output to test mariadb
+- Exit the client pod
+- View the Chart history `helm3 list -a`
+- Delete the mariadb chart `helm3 uninstall firstdb`
+- Find the chart of mariadb `find ~ -name *mariadb*`
+- Uncompress the mariadb chart
+- Copy the value.yaml to custom.yaml, and change the rootUser password and change value of persistence to false
+- Install another mariadb named `seconddb` with the custom.yaml file `helm3 install seconddb -f custom.yaml stable/mariadb`
+- Use the output of last command to run mariadb client pod and test the second mariadb
+### Remarks
+- Helm is the package manager of Kubernetes
+- One application has one chart that describes its components (e.g. deployment, service, serviceaccount..) and dependencies (i.e. sub-chart)
+- The components are defined as yaml files in **templates** folder
+- **Chart.yaml** defines the metadata (e.g. name and version of the application)
+- **Value.yaml** defines the variables which may be used by multiple files in the template folder (e.g. container port may be used by both of deployment and service)
+- Charts are normally collected in helm repositories (like git repository) or helm hub (like docker hub). Normally user should search in helm hub through command `helm3 search hub` to find the chart of the needed application and then either install it through command `helm repo add` or `helm install`
+- [Create your first helm chart](https://docs.bitnami.com/tutorials/create-your-first-helm-chart)
