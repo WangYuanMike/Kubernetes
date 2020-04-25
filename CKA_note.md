@@ -418,3 +418,14 @@
 - Dashboard must be based on a "real" monitoring/metrics object, which is Metrics Server in this case
 - Dashboard is only updated with Metrics Server, as Heapster is deprecated
 - Dashboard does not provide full functionality of Metrics Server
+## 13 Custom Resouce Definition
+### 13.1 Create a Custom Resource Definition
+- Create `crd.yaml` file which defines a new custom resource named `crontabs.training.com` with `spec.names.kind=CronTab`
+- Apply crd.yaml to add the new resource to the cluster (a resource is a k8s API object type, like pod, deployment, service)
+- List all the custom resource in the cluster `kubectl get crd`
+- Describe the newly added custom resource `kubectl describe crd crontabs.training.com`
+- Add one object of the new API resource by creating file `new-crontab.yaml` (which is like to create a pod yaml file)
+- Apply new-crontab.yaml (which is like to create a pod) `kubectl create -f new-crontab.yaml`
+- List CronTab objects `kubectl get CronTab` `kubectl get ct` (ct is short name for CronTab)
+- Command like `describe` `delete` can also be used on custom resource
+
