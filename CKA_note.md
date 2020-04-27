@@ -431,7 +431,8 @@
 ## 14 Helm
 ### 14.1 Working with Helm and Charts
 - Download helm executable `wget https://get.helm.sh/helm-v3.0.0-linux-amd64.tar.gz`
-- Uncompress it and copy the files to /usr/local/bin `sudo cp linux-amd64/helm /usr/local/bin/helm3`
+- Uncompress it `tar -xvf ...` and copy the files to /usr/local/bin `sudo cp linux-amd64/helm /usr/local/bin/helm3`
+- Search database helm chart from helm hub `helm3 search hub database`
 - Add the most common helm repository and name it as stable `helm3 repo add stable https://kubernetes-charts.storage.googleapis.com`
 - Update the repo `helm3 repo update`
 - Install mariadb with name `firstdb` through corresponding helm chart in this repo `helm3 --debug install firstdb stable/mariadb --set master.persistence.enabled=false --set slave.persistence.enabled=false` (do not need persistence to avoid creating a PV)
@@ -452,5 +453,40 @@
 - The components are defined as yaml files in **templates** folder
 - **Chart.yaml** defines the metadata (e.g. name and version of the application)
 - **Value.yaml** defines the variables which may be used by multiple files in the template folder (e.g. container port may be used by both of deployment and service)
-- Charts are normally collected in helm repositories (like git repository) or helm hub (like docker hub). Normally user should search in helm hub through command `helm3 search hub` to find the chart of the needed application and then either install it through command `helm repo add` or `helm install`
+- Charts are normally collected in helm repositories (like git repository) or helm hub (like docker hub). Normally user should search in helm hub through command `helm3 search hub` to find the chart of the needed application and then download the repository through command `helm repo add` or install it through `helm install`
 - [Create your first helm chart](https://docs.bitnami.com/tutorials/create-your-first-helm-chart)
+## 16 High Availability
+### Prepare more nodes
+- Create three more nodes: Proxy(Load Balancer), Second Master, Third Master
+### Deploy a Load Balancer
+- Install an open source tool HAProxy `sudo apt-get install -y haproxy`
+- Edit the HAProxy configuration file `sudo vim /etc/haproxy/haproxy.cfg`
+  - change from http to tcp
+  - add three master nodes' info
+- Restart the HAProxy service `sudo systemctl restart haproxy.service`
+- Edit /etc/hosts on master node, change the IP of k8smaster from the master's IP to proxy's IP
+- Open browser to test proxy server `http://<proxy public ip>:9999/stats`
+### Install Software
+- Copy and execute script `k8s_master_ha_init.sh` to install k8s softwares on second master and third master
+### Join Master Nodes
+- Edit /etc/hosts on second and thrid master, make sure the hostname `k8smaster` is corresponding to the proxy's IP
+- On master node, use command `kubeadm token create --print-join-command` to get the join command for second and third master
+- Also on master node, get the master certificate by running command `sudo kubeadm inti phase upload-certs --upload-certs`
+- On second and third master, run this command to join them as master role to the k8s cluster `sudo kubeadm join k8smaster:6443 --token <token> --discovery-token-ca-cert-hash <hash> --control-plane --certificate-key <certificate key>
+- On proxy node, uncomment the lines for second and third master in the HAProxy configuration file
+- Restart HAProxy `sudo systemctl restart haproxy.service`
+- Check status again through proxy's web page
+- Check the etcd pod name and logs
+  - `kubectl -n kube-system get pods | grep etcd`
+  - `kubectl -n kube-system logs -f etcd-<any master>`
+- Execute this command in any etcd pod to check the cluster status (e.g. who IS LEADER)
+  - `kubectl -n kube-system exec -it etcd-<any master> -- /bin/sh`
+  - `ETCDCTL_API=3 etcdctl -w table --endpoints <first master>:2379,<second master>:2379,<thrid master>:2379 --cacert /etc/kubernetes/pki/etcd/ca.crt --cert /etc/kubernetes/pki/etcd/server.crt --key /etc/kubernetes/pki/etcd/server.key endpoint status`
+  ### Test Failover
+  - Shut down the docker service on the node which shows IS LEADER = true `sudo systemctl stop docker.service`
+  - Check the etcd logs and the HAProxy web page (should see the previous leader is down now)
+  - Check the cluster status by executing the command in last section in the etcd pod
+  - Start the docker service again
+  - Checke the etcd logs, HAProxy web page, and the cluster status from etcd pod
+
+
