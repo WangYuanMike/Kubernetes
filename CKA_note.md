@@ -455,6 +455,38 @@
 - **Value.yaml** defines the variables which may be used by multiple files in the template folder (e.g. container port may be used by both of deployment and service)
 - Charts are normally collected in helm repositories (like git repository) or helm hub (like docker hub). Normally user should search in helm hub through command `helm3 search hub` to find the chart of the needed application and then download the repository through command `helm repo add` or install it through `helm install`
 - [Create your first helm chart](https://docs.bitnami.com/tutorials/create-your-first-helm-chart)
+## 15 Security
+### 15.1 Working with TLS
+- Look for `--config` file from the output of `systemctl status kubelet.service`
+- Look for `staticPodPath` from the config.yaml file found in the kubelet config file
+- Certificate info can be found in the yaml files from the staticPodPath, including etcd, apiserver, scheduler, controller manager and so on
+- Check tokens from secrets `kubectl -n kube-system get secrets` `kubectl -n kube-system get secrets certificate-controller-token -o yaml`
+- Access config of k8s cluster can also be checked via `kubectl config view` and set by `kubectl config set-credentials -h`
+- Other useful commands can be checked via `kubectl config <Tab><Tab>`
+- `sudo kubeadm config -h` is also a way to check k8s cluster config `sudo kubeadm config print init-defaults`
+- Backup the access config file so as to compare it with a change in the next section `cp ~/.kube/config ~/cluster-api-config`
+### 15.2 Authentication and Authorization
+- Create two namespaces `development` and `production`
+- View the current context `kubectl config get-contexts`
+- Create a new user in OS `sudo useradd -s /bin/bash DevDan` `sudo passwd DevDan`
+- Generate a private key and a Certificate Signing Request(CSR) for DevDan using openssl
+- Upadate the access config file to reference the new key and certificate `kubectl config set-credentials DevDan --client-certificate=/home/student/DevDan.crt --client-key=/home/student/DevDan.key`
+- Compare the config file with the backup `diff cluster-api-config ~/.kube/config`
+- Create a context for user DevDan in development namespace `kubectl config set-context DevDan-context --cluster=kubernetes --namespace=development --user=DevDan`
+- List the pods in this context (should fail due to lack of authorization) `kubectl --context=DevDan-context get pods`
+- List the contexts `kubectl config get-contexts`
+- Create a yaml file for Role `kubectl create -f role-dev.yaml`
+- Create a yaml file for Rolebinding `kubectl apply -f rolebind.yaml`
+- Create a deployment in the development context `kubectl --context=DevDan-context create deployment nginx --image=nginx`
+- List the pods in this context again (should see one pod now)
+- Delete the deployment in this context `kubectl --context=DevDan=context delete deploy nginx`
+- Copy and edit the yaml file for Role and Rolebinding for production namespace, take the `create` verb out
+- Apply these two yaml files for user DevDan in production namespace `kubectl config set-context ProdDan-context --cluster=kubernetes --namespace=production --user=DevDan`
+- List the pods in the production context (should be successful, but there is no pod) `kubectl --context=ProdDan-context get pods`
+- Create a deployment in the production context `kubectl --context=ProdDan-context create deployment nginx --image=nginx` (Should fail due to lack of authorization)
+- View the details of the role `kubectl -n production describe role dev-prod`
+### 15.3 Admission Controllers
+- How to check the admission controller settings `sudo grep admission /etc/kubernetes/manifests/kube-apiserver.yaml`
 ## 16 High Availability
 ### Prepare more nodes
 - Create three more nodes: Proxy(Load Balancer), Second Master, Third Master
