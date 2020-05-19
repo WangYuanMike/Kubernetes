@@ -470,6 +470,7 @@
 - View the current context `kubectl config get-contexts`
 - Create a new user in OS `sudo useradd -s /bin/bash DevDan` `sudo passwd DevDan`
 - Generate a private key and a Certificate Signing Request(CSR) for DevDan using openssl
+- Generate a Certificate based on the private key and CSR using openssl
 - Upadate the access config file to reference the new key and certificate `kubectl config set-credentials DevDan --client-certificate=/home/student/DevDan.crt --client-key=/home/student/DevDan.key`
 - Compare the config file with the backup `diff cluster-api-config ~/.kube/config`
 - Create a context for user DevDan in development namespace `kubectl config set-context DevDan-context --cluster=kubernetes --namespace=development --user=DevDan`
