@@ -112,7 +112,7 @@
 - When the node can be used again after maintenance, then uncordon it `kubectl uncordon <worker node name>`
 ## 5 APIs and Access
 ### 5.1 Configuring TLS Access
-- Prepare ca certificate (server certificate), client certificate, and client private key:
+- Prepare ca certificate, client certificate, and client private key:
   - Retrieve data from `~./kube/config`
   - Create pem file, e.g. `echo $client | base64 -d - > ./client.pem`
 - Execute curl command with these three pem files to access kube-apiserver
