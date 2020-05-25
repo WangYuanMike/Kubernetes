@@ -142,7 +142,7 @@
 ## 6 API Objects
 ### 6.1 RESTful API Access
 - Get secret which contains token in default namespace `kubectl get secrets`
-- Get token out of the secret `export token=$(kubectl describe secret <default-token-name> | grep ^token | cut -d ' ' -f 7)`
+- Get token out of the secret `export token=$(kubectl describe secret <secret-of-default-user> | grep ^token | cut -d ' ' -f 7)`
 - Use token to access k8s api server `curl https://k8smaster:6443/apis -H "Authorization: Bearer $token" --cacert ./ca.pem`
 #### Remarks
 - Bearer token could be an option to replace the client certificate and client private key which are mentioned in last chapter
